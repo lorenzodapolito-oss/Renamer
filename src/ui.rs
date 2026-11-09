@@ -44,10 +44,20 @@ const INVALID_BG: Color32 = Color32::from_rgb(0xFF, 0xEB, 0xEE);
 const ROW_H: f32 = 22.0;
 
 enum Dialog {
-    Info { title: String, text: String },
-    Confirm { title: String, ops: Vec<Op> },
+    Info {
+        title: String,
+        text: String,
+    },
+    Confirm {
+        title: String,
+        ops: Vec<Op>,
+    },
     /// Summary plus the details of what went wrong.
-    Result { title: String, count: usize, errors: Vec<String> },
+    Result {
+        title: String,
+        count: usize,
+        errors: Vec<String>,
+    },
 }
 
 pub struct App {
@@ -95,7 +105,10 @@ impl App {
     }
 
     fn info(&mut self, title: &str, text: impl Into<String>) {
-        self.dialog = Some(Dialog::Info { title: title.to_string(), text: text.into() });
+        self.dialog = Some(Dialog::Info {
+            title: title.to_string(),
+            text: text.into(),
+        });
     }
 
     /// Reads the folder again and rebuilds the preview.
@@ -151,9 +164,15 @@ impl App {
     /// Asks for confirmation before renaming (or says there is nothing to do).
     pub fn queue_ops(&mut self, title: &str, ops: Vec<Op>) {
         if ops.is_empty() {
-            self.info(title, "Nessuna modifica — Nessun file soddisfa i criteri di rinomina.");
+            self.info(
+                title,
+                "Nessuna modifica — Nessun file soddisfa i criteri di rinomina.",
+            );
         } else {
-            self.dialog = Some(Dialog::Confirm { title: title.to_string(), ops });
+            self.dialog = Some(Dialog::Confirm {
+                title: title.to_string(),
+                ops,
+            });
         }
     }
 
@@ -162,11 +181,18 @@ impl App {
             self.info("Attenzione", "Inserisci il testo da rimuovere.");
             return;
         }
-        let Some(folder) = self.get_valid_folder() else { return };
+        let Some(folder) = self.get_valid_folder() else {
+            return;
+        };
         let files = rename::list_files(&folder).unwrap_or_default();
         let blockers = rename::removal_blockers(&files, &self.find);
         if !blockers.is_empty() {
-            let shown = blockers.iter().take(10).cloned().collect::<Vec<_>>().join("\n");
+            let shown = blockers
+                .iter()
+                .take(10)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n");
             let extra = if blockers.len() > 10 {
                 format!("\n... e altri {}", blockers.len() - 10)
             } else {
@@ -191,21 +217,27 @@ impl App {
     }
 
     fn run_replace(&mut self, title: &str) {
-        let Some(folder) = self.get_valid_folder() else { return };
+        let Some(folder) = self.get_valid_folder() else {
+            return;
+        };
         let files = rename::list_files(&folder).unwrap_or_default();
         let plan = rename::plan_replace(&folder, &files, &self.find, &self.replace);
         self.finish_plan(title, plan, true);
     }
 
     pub fn remove_dots(&mut self) {
-        let Some(folder) = self.get_valid_folder() else { return };
+        let Some(folder) = self.get_valid_folder() else {
+            return;
+        };
         let files = rename::list_files(&folder).unwrap_or_default();
         let plan = rename::plan_remove_dots(&folder, &files);
         self.finish_plan("Rimozione Punti", plan, false);
     }
 
     pub fn convert_sxxe(&mut self) {
-        let Some(folder) = self.get_valid_folder() else { return };
+        let Some(folder) = self.get_valid_folder() else {
+            return;
+        };
         let files = rename::list_files(&folder).unwrap_or_default();
         let plan = rename::plan_sxxe(&folder, &files);
         self.finish_plan("Conversione S01E01", plan, false);
@@ -213,8 +245,11 @@ impl App {
 
     fn finish_plan(&mut self, title: &str, plan: Plan, show_errors: bool) {
         if show_errors && !plan.errors.is_empty() && plan.ops.is_empty() {
-            self.dialog =
-                Some(Dialog::Result { title: title.to_string(), count: 0, errors: plan.errors });
+            self.dialog = Some(Dialog::Result {
+                title: title.to_string(),
+                count: 0,
+                errors: plan.errors,
+            });
             return;
         }
         self.queue_ops(&format!("Completato - {title}"), plan.ops);
@@ -230,7 +265,11 @@ impl App {
         if errors.is_empty() {
             self.info(title, format!("✅ Modificati {count} file con successo."));
         } else {
-            self.dialog = Some(Dialog::Result { title: title.to_string(), count, errors });
+            self.dialog = Some(Dialog::Result {
+                title: title.to_string(),
+                count,
+                errors,
+            });
         }
     }
 
@@ -246,7 +285,12 @@ impl App {
             msg.push_str(&format!(
                 "\nErrore nel ripristino di {} file:\n{}",
                 errors.len(),
-                errors.iter().take(10).cloned().collect::<Vec<_>>().join("\n")
+                errors
+                    .iter()
+                    .take(10)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join("\n")
             ));
         }
         self.info("Undo", msg);
@@ -299,16 +343,29 @@ fn panel(fill: Color32, line: Color32, width: f32) -> Frame {
         .inner_margin(Margin::same(15))
 }
 
-fn button(ui: &mut Ui, text: &str, size: f32, fill: Color32, hover: Color32, dims: [f32; 2]) -> bool {
+fn button(
+    ui: &mut Ui,
+    text: &str,
+    size: f32,
+    fill: Color32,
+    hover: Color32,
+    dims: [f32; 2],
+) -> bool {
     let resp = ui.add_sized(
         dims,
-        egui::Button::new(RichText::new(text).size(size + 1.5).strong().color(Color32::WHITE))
-            .fill(fill)
-            .stroke(Stroke::NONE)
-            .corner_radius(CornerRadius::same(8)),
+        egui::Button::new(
+            RichText::new(text)
+                .size(size + 1.5)
+                .strong()
+                .color(Color32::WHITE),
+        )
+        .fill(fill)
+        .stroke(Stroke::NONE)
+        .corner_radius(CornerRadius::same(8)),
     );
     if resp.hovered() {
-        ui.painter().rect_filled(resp.rect, CornerRadius::same(8), hover);
+        ui.painter()
+            .rect_filled(resp.rect, CornerRadius::same(8), hover);
         ui.painter().text(
             resp.rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -320,7 +377,15 @@ fn button(ui: &mut Ui, text: &str, size: f32, fill: Color32, hover: Color32, dim
     resp.clicked()
 }
 
-fn entry(ui: &mut Ui, text: &mut String, id: &str, hint: &str, line: Color32, h: f32, size: f32) -> egui::Response {
+fn entry(
+    ui: &mut Ui,
+    text: &mut String,
+    id: &str,
+    hint: &str,
+    line: Color32,
+    h: f32,
+    size: f32,
+) -> egui::Response {
     let width = ui.available_width();
     Frame::new()
         .fill(Color32::WHITE)
@@ -364,7 +429,12 @@ impl eframe::App for App {
 impl App {
     fn main_ui(&mut self, ui: &mut Ui) {
         ui.vertical_centered(|ui| {
-            ui.label(RichText::new("Renamer Portable  MASTER").size(22.0).strong().color(TITLE));
+            ui.label(
+                RichText::new("Renamer Portable  MASTER")
+                    .size(22.0)
+                    .strong()
+                    .color(TITLE),
+            );
             ui.label(
                 RichText::new(
                     "by Lorenzo D'Apolito - Master Release (1 validazione, 1 esecuzione, UX smart)",
@@ -403,25 +473,44 @@ impl App {
                     });
                 },
             );
-            panel(BG_FRAME, ACCENT, 2.0).inner_margin(Margin::same(10)).show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    if button(ui, "Rimuovi Punti", 11.0, BUTTON, BUTTON_HOVER, [130.0, 35.0]) {
-                        self.remove_dots();
-                    }
-                    if button(ui, "Converti S01E01", 11.0, BUTTON, BUTTON_HOVER, [130.0, 35.0]) {
-                        self.convert_sxxe();
-                    }
-                    if button(ui, "↩ Undo", 11.0, ACCENT, ACCENT_HOVER, [80.0, 35.0]) {
-                        self.undo_last();
-                    }
+            panel(BG_FRAME, ACCENT, 2.0)
+                .inner_margin(Margin::same(10))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        if button(
+                            ui,
+                            "Rimuovi Punti",
+                            11.0,
+                            BUTTON,
+                            BUTTON_HOVER,
+                            [130.0, 35.0],
+                        ) {
+                            self.remove_dots();
+                        }
+                        if button(
+                            ui,
+                            "Converti S01E01",
+                            11.0,
+                            BUTTON,
+                            BUTTON_HOVER,
+                            [130.0, 35.0],
+                        ) {
+                            self.convert_sxxe();
+                        }
+                        if button(ui, "↩ Undo", 11.0, ACCENT, ACCENT_HOVER, [80.0, 35.0]) {
+                            self.undo_last();
+                        }
+                    });
                 });
-            });
         });
         ui.add_space(20.0);
 
         // bottom panels first, so the list takes what is left
         egui::Panel::bottom("find_replace")
-            .frame(Frame::new().fill(BG_MAIN).inner_margin(Margin { top: 5, ..Default::default() }))
+            .frame(Frame::new().fill(BG_MAIN).inner_margin(Margin {
+                top: 5,
+                ..Default::default()
+            }))
             .show_separator_line(false)
             .show(ui, |ui| self.find_replace_ui(ui));
 
@@ -438,7 +527,15 @@ impl App {
                         let w = ui.available_width() - 140.0;
                         let r = ui
                             .allocate_ui(egui::vec2(w, 45.0), |ui| {
-                                entry(ui, &mut self.find, "find", "Testo da cercare...", FIND_LINE, 45.0, 14.0)
+                                entry(
+                                    ui,
+                                    &mut self.find,
+                                    "find",
+                                    "Testo da cercare...",
+                                    FIND_LINE,
+                                    45.0,
+                                    14.0,
+                                )
                             })
                             .inner;
                         if self.focus_find {
@@ -453,20 +550,47 @@ impl App {
                                 st.store(ui.ctx(), r.id);
                             }
                         }
-                        if button(ui, "RIMUOVI", 13.0, FIND_BUTTON, FIND_BUTTON_HOVER, [130.0, 45.0]) {
+                        if button(
+                            ui,
+                            "RIMUOVI",
+                            13.0,
+                            FIND_BUTTON,
+                            FIND_BUTTON_HOVER,
+                            [130.0, 45.0],
+                        ) {
                             self.apply_removal();
                         }
                     });
                 });
-                right.label(RichText::new("SOSTITUISCI CON").size(16.0).strong().color(REPL_LABEL));
+                right.label(
+                    RichText::new("SOSTITUISCI CON")
+                        .size(16.0)
+                        .strong()
+                        .color(REPL_LABEL),
+                );
                 panel(REPL_BG, REPL_LINE, 3.0).show(right, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         let w = ui.available_width() - 150.0;
                         ui.allocate_ui(egui::vec2(w, 45.0), |ui| {
-                            entry(ui, &mut self.replace, "replace", "Nuovo testo...", REPL_LINE, 45.0, 14.0);
+                            entry(
+                                ui,
+                                &mut self.replace,
+                                "replace",
+                                "Nuovo testo...",
+                                REPL_LINE,
+                                45.0,
+                                14.0,
+                            );
                         });
-                        if button(ui, "SOSTITUISCI", 13.0, REPL_LINE, REPL_BUTTON_HOVER, [140.0, 45.0]) {
+                        if button(
+                            ui,
+                            "SOSTITUISCI",
+                            13.0,
+                            REPL_LINE,
+                            REPL_BUTTON_HOVER,
+                            [140.0, 45.0],
+                        ) {
                             self.apply_replacement();
                         }
                     });
@@ -570,13 +694,20 @@ impl App {
     }
 
     fn dialog_ui(&mut self, ctx: &egui::Context) {
-        let Some(dialog) = self.dialog.take() else { return };
+        let Some(dialog) = self.dialog.take() else {
+            return;
+        };
         // dim the window behind
         let screen = ctx.content_rect();
-        egui::Area::new(egui::Id::new("dim")).order(egui::Order::Middle).fixed_pos(screen.min).show(ctx, |ui| {
-            let (rect, _) = ui.allocate_exact_size(screen.size(), egui::Sense::click_and_drag());
-            ui.painter().rect_filled(rect, 0.0, Color32::from_black_alpha(80));
-        });
+        egui::Area::new(egui::Id::new("dim"))
+            .order(egui::Order::Middle)
+            .fixed_pos(screen.min)
+            .show(ctx, |ui| {
+                let (rect, _) =
+                    ui.allocate_exact_size(screen.size(), egui::Sense::click_and_drag());
+                ui.painter()
+                    .rect_filled(rect, 0.0, Color32::from_black_alpha(80));
+            });
         let mut keep = true;
         let mut run: Option<(String, Vec<Op>)> = None;
         let esc = ctx.input(|i| i.key_pressed(egui::Key::Escape));
@@ -619,7 +750,11 @@ impl App {
                     keep = false;
                 }
             }
-            Dialog::Result { title, count, errors } => {
+            Dialog::Result {
+                title,
+                count,
+                errors,
+            } => {
                 modal(ctx, title, 640.0, |ui| {
                     ui.label(
                         RichText::new(format!(
@@ -631,11 +766,14 @@ impl App {
                     );
                     ui.add_space(8.0);
                     ui.label(RichText::new("Dettaglio:").size(12.0).strong());
-                    egui::ScrollArea::vertical().max_height(300.0).auto_shrink([false, true]).show(ui, |ui| {
-                        for e in errors {
-                            ui.label(e);
-                        }
-                    });
+                    egui::ScrollArea::vertical()
+                        .max_height(300.0)
+                        .auto_shrink([false, true])
+                        .show(ui, |ui| {
+                            for e in errors {
+                                ui.label(e);
+                            }
+                        });
                     ui.add_space(10.0);
                     ui.vertical_centered(|ui| {
                         if button(ui, "Chiudi", 13.0, BUTTON, BUTTON_HOVER, [120.0, 35.0]) {
@@ -675,7 +813,10 @@ mod tests {
     use super::*;
 
     fn app(dir: &Path) -> App {
-        App::new(&egui::Context::default(), dir.to_string_lossy().into_owned())
+        App::new(
+            &egui::Context::default(),
+            dir.to_string_lossy().into_owned(),
+        )
     }
 
     fn temp(tag: &str) -> PathBuf {
@@ -694,16 +835,26 @@ mod tests {
         let mut a = app(&d);
         assert_eq!(a.rows().len(), 2);
         a.set_texts(" HD", "");
-        assert_eq!(a.rows().iter().filter(|r| r.kind == RowKind::Changed).count(), 1);
+        assert_eq!(
+            a.rows()
+                .iter()
+                .filter(|r| r.kind == RowKind::Changed)
+                .count(),
+            1
+        );
         a.apply_removal();
         assert!(matches!(a.dialog, Some(Dialog::Confirm { .. })));
         // nothing happened yet
         assert!(d.join("Serie S01E02 HD.mkv").exists());
-        let Some(Dialog::Confirm { title, ops }) = a.dialog.take() else { return };
+        let Some(Dialog::Confirm { title, ops }) = a.dialog.take() else {
+            return;
+        };
         a.execute(&title, &ops);
         assert!(d.join("Serie S01E02.mkv").exists());
         a.convert_sxxe();
-        let Some(Dialog::Confirm { title, ops }) = a.dialog.take() else { return };
+        let Some(Dialog::Confirm { title, ops }) = a.dialog.take() else {
+            return;
+        };
         a.execute(&title, &ops);
         assert!(d.join("Serie 1x02.mkv").exists());
         a.undo_last();

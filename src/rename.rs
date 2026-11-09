@@ -12,7 +12,8 @@ const RESERVED: [&str; 22] = [
 ];
 
 fn has_invalid(s: &str) -> bool {
-    s.chars().any(|c| INVALID_CHARS.contains(c) || c.is_control())
+    s.chars()
+        .any(|c| INVALID_CHARS.contains(c) || c.is_control())
 }
 
 /// Trims and collapses runs of white space into single spaces.
@@ -70,7 +71,9 @@ pub fn safe_new_filename(original: &str, find: &str, replace: &str) -> (String, 
     if has_invalid(replace) {
         return (
             original.to_string(),
-            Some(format!("il testo di sostituzione contiene caratteri non validi {INVALID_CHARS}")),
+            Some(format!(
+                "il testo di sostituzione contiene caratteri non validi {INVALID_CHARS}"
+            )),
         );
     }
     let (name, ext) = split_ext(original);
@@ -106,14 +109,21 @@ pub fn preview(files: &[String], find: &str, replace: &str) -> Vec<Row> {
         } else if new != *f && fold(&new) != fold(f) && existing.contains(&fold(&new)) {
             (format!("⚠ {new} — esiste già"), RowKind::Invalid)
         } else if new != *f && planned.contains(&fold(&new)) {
-            (format!("⚠ {new} — duplicato in questa operazione"), RowKind::Invalid)
+            (
+                format!("⚠ {new} — duplicato in questa operazione"),
+                RowKind::Invalid,
+            )
         } else if new != *f {
             planned.insert(fold(&new));
             (new, RowKind::Changed)
         } else {
             (new, RowKind::Same)
         };
-        rows.push(Row { original: f.clone(), shown, kind });
+        rows.push(Row {
+            original: f.clone(),
+            shown,
+            kind,
+        });
     }
     rows
 }
@@ -157,7 +167,11 @@ fn push_op(
         return;
     }
     planned.insert(fold(&new));
-    plan.ops.push(Op { original: f.to_string(), from: folder.join(f), to: folder.join(&new) });
+    plan.ops.push(Op {
+        original: f.to_string(),
+        from: folder.join(f),
+        to: folder.join(&new),
+    });
 }
 
 fn name_sets(files: &[String]) -> (HashSet<String>, HashSet<String>) {
@@ -295,7 +309,10 @@ pub fn execute(ops: &[Op]) -> (Done, Vec<String>) {
     let (mut done, mut errors) = (Vec::new(), Vec::new());
     for op in ops {
         if op.to.exists() && !same_file_name(&op.from, &op.to) {
-            errors.push(format!("{}: il file di destinazione esiste già", op.original));
+            errors.push(format!(
+                "{}: il file di destinazione esiste già",
+                op.original
+            ));
             continue;
         }
         match std::fs::rename(&op.from, &op.to) {
@@ -316,7 +333,9 @@ pub fn undo(done: &[(PathBuf, PathBuf)]) -> (usize, Vec<String>) {
         if old.exists() && !same_file_name(new, old) {
             errors.push(format!(
                 "{}: esiste già un file con il nome originale",
-                new.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+                new.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default()
             ));
             continue;
         }
@@ -324,7 +343,9 @@ pub fn undo(done: &[(PathBuf, PathBuf)]) -> (usize, Vec<String>) {
             Ok(()) => count += 1,
             Err(e) => errors.push(format!(
                 "{}: {e}",
-                new.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+                new.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default()
             )),
         }
     }
@@ -358,21 +379,45 @@ mod tests {
 
     #[test]
     fn validation_rejects_bad_names() {
-        assert!(validate_base("  ", ".mkv", "a.mkv").1.unwrap().contains("vuoto"));
-        assert!(validate_base("a:b", ".mkv", "a.mkv").1.unwrap().contains("non validi"));
-        assert!(validate_base("con", ".txt", "a.txt").1.unwrap().contains("riservato"));
+        assert!(validate_base("  ", ".mkv", "a.mkv")
+            .1
+            .unwrap()
+            .contains("vuoto"));
+        assert!(validate_base("a:b", ".mkv", "a.mkv")
+            .1
+            .unwrap()
+            .contains("non validi"));
+        assert!(validate_base("con", ".txt", "a.txt")
+            .1
+            .unwrap()
+            .contains("riservato"));
         assert!(validate_base("NUL.backup", ".txt", "a.txt").1.is_some());
-        assert!(validate_base("a.", ".txt", "a.txt").1.unwrap().contains("termina"));
-        assert_eq!(validate_base("  a   b ", ".mkv", "x.mkv"), ("a b.mkv".to_string(), None));
+        assert!(validate_base("a.", ".txt", "a.txt")
+            .1
+            .unwrap()
+            .contains("termina"));
+        assert_eq!(
+            validate_base("  a   b ", ".mkv", "x.mkv"),
+            ("a b.mkv".to_string(), None)
+        );
         // nothing changed: the original name comes back
-        assert_eq!(validate_base("a", ".mkv", "a.mkv"), ("a.mkv".to_string(), None));
+        assert_eq!(
+            validate_base("a", ".mkv", "a.mkv"),
+            ("a.mkv".to_string(), None)
+        );
     }
 
     #[test]
     fn replace_only_touches_the_name() {
-        assert_eq!(safe_new_filename("Film HD.mkv", " HD", ""), ("Film.mkv".to_string(), None));
+        assert_eq!(
+            safe_new_filename("Film HD.mkv", " HD", ""),
+            ("Film.mkv".to_string(), None)
+        );
         // the extension is never searched
-        assert_eq!(safe_new_filename("a.mkv", "mkv", "x"), ("a.mkv".to_string(), None));
+        assert_eq!(
+            safe_new_filename("a.mkv", "mkv", "x"),
+            ("a.mkv".to_string(), None)
+        );
         assert!(safe_new_filename("a.mkv", "a", "b/c").1.is_some());
         assert_eq!(safe_new_filename("a.mkv", "", "x").1, None);
     }
@@ -400,7 +445,10 @@ mod tests {
         assert_eq!(convert_sxxe("s2.e10"), "2x10");
         assert_eq!(convert_sxxe("S1 - E3 x"), "1x03 x");
         assert_eq!(convert_sxxe("Sunset E5"), "Sunset E5");
-        assert_eq!(convert_sxxe("S99999999999999999999999E1"), "S99999999999999999999999E1");
+        assert_eq!(
+            convert_sxxe("S99999999999999999999999E1"),
+            "S99999999999999999999999E1"
+        );
         assert_eq!(convert_sxxe("è S01E02 è"), "è 1x02 è");
     }
 
@@ -435,7 +483,11 @@ mod tests {
         let d = temp("noover");
         std::fs::write(d.join("a.txt"), b"1").unwrap();
         std::fs::write(d.join("b.txt"), b"2").unwrap();
-        let ops = vec![Op { original: "a.txt".into(), from: d.join("a.txt"), to: d.join("b.txt") }];
+        let ops = vec![Op {
+            original: "a.txt".into(),
+            from: d.join("a.txt"),
+            to: d.join("b.txt"),
+        }];
         let (done, errors) = execute(&ops);
         assert!(done.is_empty() && errors.len() == 1);
         assert_eq!(std::fs::read(d.join("b.txt")).unwrap(), b"2");
