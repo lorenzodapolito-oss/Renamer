@@ -11,8 +11,8 @@ use crate::rename::{self, Done, Op, Plan, Row, RowKind};
 
 pub const APP_TITLE: &str = "Renamer Portable - MASTER";
 
-const BG_MAIN: Color32 = Color32::from_rgb(0xF0, 0xE6, 0xF6);
-const BG_FRAME: Color32 = Color32::from_rgb(0xE8, 0xF4, 0xF8);
+const BG_MAIN: Color32 = Color32::from_rgb(0xE3, 0xD4, 0xF3);
+const BG_FRAME: Color32 = Color32::from_rgb(0xD2, 0xEB, 0xF6);
 const ACCENT: Color32 = Color32::from_rgb(0xB4, 0xA7, 0xD6);
 const ACCENT_HOVER: Color32 = Color32::from_rgb(0x9A, 0x8A, 0xAF);
 const BUTTON: Color32 = Color32::from_rgb(0x9E, 0xC5, 0xAB);
@@ -36,10 +36,12 @@ const REPL_LABEL: Color32 = Color32::from_rgb(0x2C, 0x6F, 0xBB);
 const REPL_BUTTON_HOVER: Color32 = Color32::from_rgb(0x3A, 0x7B, 0xC8);
 const TITLE: Color32 = Color32::from_rgb(0x7B, 0x5E, 0xA7);
 const SUBTITLE: Color32 = ACCENT_HOVER;
-const TEXT: Color32 = Color32::from_rgb(0x2B, 0x2B, 0x33);
+const TEXT: Color32 = Color32::from_rgb(0x2B, 0x2A, 0x5C);
+/// Campi di testo e finestre: crema (mai bianco).
+const FIELD: Color32 = Color32::from_rgb(0xFF, 0xF4, 0xC2);
 const CHANGED: Color32 = Color32::from_rgb(0x2E, 0x7D, 0x32);
 const INVALID: Color32 = Color32::from_rgb(0xC6, 0x28, 0x28);
-const INVALID_BG: Color32 = Color32::from_rgb(0xFF, 0xEB, 0xEE);
+const INVALID_BG: Color32 = Color32::from_rgb(0xFF, 0xD6, 0xDC);
 
 const ROW_H: f32 = 22.0;
 
@@ -319,17 +321,29 @@ impl App {
 
 // ---- drawing ------------------------------------------------------------------------------
 
-fn apply_theme(ctx: &egui::Context) {
-    ctx.set_theme(egui::ThemePreference::Light);
+fn visuals() -> egui::Visuals {
     let mut v = egui::Visuals::light();
     v.panel_fill = BG_MAIN;
-    v.window_fill = Color32::WHITE;
-    v.extreme_bg_color = Color32::WHITE;
+    v.window_fill = FIELD;
+    v.extreme_bg_color = FIELD;
+    v.faint_bg_color = BG_FRAME;
+    v.code_bg_color = FIELD;
     v.override_text_color = Some(TEXT);
     v.selection.bg_fill = ACCENT;
-    v.selection.stroke.color = Color32::WHITE;
+    v.selection.stroke.color = TEXT;
     v.window_corner_radius = CornerRadius::same(14);
     v.window_stroke = Stroke::new(2.0, ACCENT);
+    colorize(
+        &mut v,
+        Color32::from_rgb(0xD8, 0xC4, 0xF0),
+        Color32::from_rgb(0x2B, 0x2A, 0x5C),
+    );
+    v
+}
+
+fn apply_theme(ctx: &egui::Context) {
+    ctx.set_theme(egui::ThemePreference::Light);
+    let v = visuals();
     for theme in [egui::Theme::Dark, egui::Theme::Light] {
         ctx.set_visuals_of(theme, v.clone());
     }
@@ -353,15 +367,10 @@ fn button(
 ) -> bool {
     let resp = ui.add_sized(
         dims,
-        egui::Button::new(
-            RichText::new(text)
-                .size(size + 1.5)
-                .strong()
-                .color(Color32::WHITE),
-        )
-        .fill(fill)
-        .stroke(Stroke::NONE)
-        .corner_radius(CornerRadius::same(8)),
+        egui::Button::new(RichText::new(text).size(size + 1.5).strong().color(TEXT))
+            .fill(fill)
+            .stroke(Stroke::NONE)
+            .corner_radius(CornerRadius::same(8)),
     );
     if resp.hovered() {
         ui.painter()
@@ -371,7 +380,7 @@ fn button(
             egui::Align2::CENTER_CENTER,
             text,
             FontId::proportional(size + 1.5),
-            Color32::WHITE,
+            TEXT,
         );
     }
     resp.clicked()
@@ -388,7 +397,7 @@ fn entry(
 ) -> egui::Response {
     let width = ui.available_width();
     Frame::new()
-        .fill(Color32::WHITE)
+        .fill(FIELD)
         .stroke(Stroke::new(2.0, line))
         .corner_radius(CornerRadius::same(10))
         .inner_margin(Margin::symmetric(8, 0))
@@ -705,8 +714,11 @@ impl App {
             .show(ctx, |ui| {
                 let (rect, _) =
                     ui.allocate_exact_size(screen.size(), egui::Sense::click_and_drag());
-                ui.painter()
-                    .rect_filled(rect, 0.0, Color32::from_black_alpha(80));
+                ui.painter().rect_filled(
+                    rect,
+                    0.0,
+                    Color32::from_rgba_unmultiplied(0x2B, 0x2A, 0x5C, 90),
+                );
             });
         let mut keep = true;
         let mut run: Option<(String, Vec<Op>)> = None;
@@ -808,8 +820,136 @@ fn modal(ctx: &egui::Context, title: &str, width: f32, add: impl FnOnce(&mut Ui)
         });
 }
 
+/// Bianco e grigio non devono esistere: ogni colore neutro (anche quelli che egui mette di
+/// default, come il testo dei pulsanti, le ombre o i bordi) prende una tinta.
+/// I chiari vanno verso `light`, gli scuri verso `dark`.
+pub fn colorize(v: &mut egui::Visuals, light: Color32, dark: Color32) {
+    fn fix(c: &mut Color32, light: Color32, dark: Color32) {
+        if !is_neutral(*c) {
+            return;
+        }
+        let [r, g, b, a] = c.to_srgba_unmultiplied();
+        let lum = (u32::from(r) * 3 + u32::from(g) * 6 + u32::from(b)) / 10;
+        let (tone, t) = if lum >= 128 {
+            (light, 0.85)
+        } else {
+            (dark, 0.9)
+        };
+        let mix = |x: u8, y: u8| (f32::from(x) + (f32::from(y) - f32::from(x)) * t).round() as u8;
+        let [tr, tg, tb, _] = tone.to_srgba_unmultiplied();
+        *c = Color32::from_rgba_unmultiplied(mix(r, tr), mix(g, tg), mix(b, tb), a);
+    }
+    for c in [
+        &mut v.panel_fill,
+        &mut v.window_fill,
+        &mut v.extreme_bg_color,
+        &mut v.faint_bg_color,
+        &mut v.code_bg_color,
+        &mut v.window_stroke.color,
+        &mut v.window_shadow.color,
+        &mut v.popup_shadow.color,
+        &mut v.selection.bg_fill,
+        &mut v.selection.stroke.color,
+        &mut v.hyperlink_color,
+        &mut v.text_cursor.stroke.color,
+        &mut v.warn_fg_color,
+        &mut v.error_fg_color,
+    ] {
+        fix(c, light, dark);
+    }
+    for c in [
+        &mut v.override_text_color,
+        &mut v.weak_text_color,
+        &mut v.text_edit_bg_color,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        fix(c, light, dark);
+    }
+    for w in [
+        &mut v.widgets.noninteractive,
+        &mut v.widgets.inactive,
+        &mut v.widgets.hovered,
+        &mut v.widgets.active,
+        &mut v.widgets.open,
+    ] {
+        fix(&mut w.bg_fill, light, dark);
+        fix(&mut w.weak_bg_fill, light, dark);
+        fix(&mut w.bg_stroke.color, light, dark);
+        fix(&mut w.fg_stroke.color, light, dark);
+    }
+}
+
+/// Neutro = bianco, grigio o quasi (i canali RGB differiscono di meno di 24).
+pub fn is_neutral(c: Color32) -> bool {
+    let [r, g, b, a] = c.to_srgba_unmultiplied().map(i32::from);
+    // Un colore del tutto trasparente non si vede: non è né bianco né grigio.
+    a > 0 && r.max(g).max(b) - r.min(g).min(b) < 24
+}
+
 #[cfg(test)]
 mod tests {
+    use super::{is_neutral, visuals};
+
+    #[test]
+    fn no_white_or_gray_anywhere_in_the_visuals() {
+        let v = visuals();
+        let mut named: Vec<(&str, Color32)> = vec![
+            ("panel", v.panel_fill),
+            ("window", v.window_fill),
+            ("faint", v.faint_bg_color),
+            ("extreme", v.extreme_bg_color),
+            ("code", v.code_bg_color),
+            ("window_stroke", v.window_stroke.color),
+            ("window_shadow", v.window_shadow.color),
+            ("popup_shadow", v.popup_shadow.color),
+            ("selection", v.selection.bg_fill),
+            ("selection_stroke", v.selection.stroke.color),
+            ("hyperlink", v.hyperlink_color),
+            ("cursor", v.text_cursor.stroke.color),
+            ("warn", v.warn_fg_color),
+            ("error", v.error_fg_color),
+        ];
+        for (n, c) in [
+            ("text", v.override_text_color),
+            ("weak_text", v.weak_text_color),
+            ("text_edit", v.text_edit_bg_color),
+        ] {
+            if let Some(c) = c {
+                named.push((n, c));
+            }
+        }
+        for (n, w) in [
+            ("noninteractive", v.widgets.noninteractive),
+            ("inactive", v.widgets.inactive),
+            ("hovered", v.widgets.hovered),
+            ("active", v.widgets.active),
+            ("open", v.widgets.open),
+        ] {
+            named.push((n, w.bg_fill));
+            named.push((n, w.weak_bg_fill));
+            named.push((n, w.bg_stroke.color));
+            named.push((n, w.fg_stroke.color));
+        }
+        for (n, c) in named {
+            assert!(!is_neutral(c), "{n}: {c:?} è bianco o grigio");
+        }
+    }
+
+    #[test]
+    fn palette_constants_are_never_white_or_gray() {
+        for (n, c) in [
+            ("BG_MAIN", BG_MAIN),
+            ("BG_FRAME", BG_FRAME),
+            ("INVALID_BG", INVALID_BG),
+            ("FIELD", FIELD),
+            ("TEXT", TEXT),
+        ] {
+            assert!(!is_neutral(c), "{n}: {c:?}");
+        }
+    }
+
     use super::*;
 
     fn app(dir: &Path) -> App {
